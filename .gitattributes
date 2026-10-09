@@ -1,0 +1,17 @@
+# 默认走 LF，个别文件单独指定。
+# ⚠️ 这一条不是洁癖：.sh 被检出成 CRLF 之后，bash 会直接报错跑不起来；
+# 而 .bat 反过来必须 CRLF，LF 换行会让 cmd.exe 解析错乱。
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.sh  text eol=lf
+*.py  text eol=lf
+*.md  text eol=lf
+*.json text eol=lf
+
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.zip  binary
