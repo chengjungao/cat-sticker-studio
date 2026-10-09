@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>表情包工坊</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 9.5 5.2 5.4a1 1 0 0 1 1.7-.4L9 7.2M20 9.5 18.8 5.4a1 1 0 0 0-1.7-.4L15 7.2"/>
+        <path d="M12 7.6c3.6 0 6.5 2.4 6.5 5.6 0 2.8-2.6 4.8-6.5 4.8S5.5 16 5.5 13.2c0-3.2 2.9-5.6 6.5-5.6Z"/>
+      </svg>
+    </span>
+    <b>表情包工坊</b>
+    <span class="tag">本地出图 · 不上传云端</span>
+  </div>
+  <div class="topbar-right">
+    <button id="btn-health" class="ghost" type="button">环境自检</button>
+    <span id="health-badge" class="badge badge-idle">未检查</span>
+    <button id="btn-settings" class="ghost" type="button">设置</button>
+    <button id="btn-open" class="ghost" type="button">打开文件夹</button>
+  </div>
+</header>
+
+<main>
+  <div class="grid">
+
+    <!-- ══════════════ 左：输入 ══════════════ -->
+    <section class="col-left">
+
+      <div class="card">
+        <h2><span class="step">1</span>传一张你家猫的照片</h2>
+        <div id="drop" class="drop">
+          <input type="file" id="file" accept="image/*" hidden>
+          <div id="drop-empty" class="drop-empty">
+            <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+            </svg>
+            <p><b>点这里选图</b>，或把照片拖进来</p>
+            <p class="hint">正面、全身入镜、光线均匀的一张最稳</p>
+          </div>
+          <div id="drop-preview" class="drop-preview hidden">
+            <img id="photo-img" alt="你上传的照片">
+            <div class="drop-preview-actions">
+              <button id="btn-replace" class="ghost small" type="button">换一张</button>
+              <button id="btn-remove" class="ghost small danger" type="button">删掉</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="step">2</span>说说它长什么样</h2>
+        <textarea id="desc" rows="3"
+          placeholder="例：橘白相间，额头有白色竖纹，胸口一大片白，尾巴橘色带条纹，眼睛是琥珀色"></textarea>
+        <p class="hint">
+          照片负责长相，这句话负责把特征说清楚。两个一起给最稳。
+          不填也能跑，但填了更容易「还是我家那只」。
+        </p>
+      </div>
+
+      <div class="card">
+        <h2><span class="step">3</span>挑八个想用在聊天里的词</h2>
+        <div id="moods" class="moods"></div>
+        <p class="hint">
+          ⚠️ 每个词 <b>2~4 个字</b>是模型能画对的范围，再多开始缺笔画。
+          字是模型直接画进画面的，不是事后用字体贴上去的。
+        </p>
+      </div>
+
+      <div class="card">
+        <h2><span class="step">4</span>开始</h2>
+        <div class="opts">
+          <label class="opt">
+            <input type="checkbox" id="from-photo" checked>
+            <span>用照片当参考（关掉＝只按上面的文字凭空画一只）</span>
+          </label>
+          <label class="opt">
+            <input type="checkbox" id="pause-hero">
+            <span>先出定妆照让我看一眼，再继续</span>
+          </label>
+          <label class="opt">
+            <span class="opt-label">种子</span>
+            <input type="number" id="seed" class="mini">
+            <span class="hint-inline">换一个＝换一种画法</span>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="btn-run" class="primary big" type="button">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5v17l14-8.5-14-8.5Z"/></svg>
+            一键生成整套表情
+          </button>
+          <button id="btn-cancel" class="ghost hidden" type="button">取消</button>
+        </div>
+
+        <div class="sub-actions">
+          <button id="btn-hero" class="ghost small" type="button">只出定妆照</button>
+          <button id="btn-frames" class="ghost small" type="button">只出表情图</button>
+          <button id="btn-post" class="ghost small" type="button">只做后处理</button>
+          <button id="btn-repack" class="ghost small" type="button">重新打包</button>
+        </div>
+
+        <div id="hero-box" class="hero-box hidden">
+          <img id="hero-img" alt="定妆照">
+          <div class="hero-side">
+            <p>定妆照是整套表情一致性的来源。它不像，后面十六张都会跟着不像。</p>
+            <button id="btn-continue" class="primary" type="button">就它了，继续出表情</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ 右：进度 ══════════════ -->
+    <section class="col-right">
+      <div class="card sticky">
+        <h2>进度</h2>
+        <div class="stage-line">
+          <span id="stage-name" class="stage-name">待命</span>
+          <span id="stage-time" class="muted"></span>
+        </div>
+        <div class="bar"><div id="bar" class="bar-in"></div></div>
+        <div class="stage-sub">
+          <span id="stage-msg" class="muted">准备好了就点左边那个按钮</span>
+          <span id="queue-info" class="muted"></span>
+        </div>
+        <div id="log" class="log"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ══════════════ 结果 ══════════════ -->
+  <section id="result" class="result hidden">
+    <div class="result-head">
+      <h2>成品</h2>
+      <div class="result-head-right">
+        <label class="opt small-opt">
+          <input type="checkbox" id="dark-bg">
+          <span>用深色聊天底预览</span>
+        </label>
+        <button id="btn-zip" class="primary" type="button">下载整套 zip</button>
+        <button id="btn-manifest" class="ghost" type="button">看提交清单</button>
+      </div>
+    </div>
+
+    <div id="gifs" class="gifs"></div>
+
+    <h3 class="sub-title">另外三件（平台要求的）</h3>
+    <div id="assets" class="assets"></div>
+
+    <div id="manifest" class="manifest hidden"></div>
+  </section>
+</main>
+
+<!-- 设置弹窗 -->
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>设置</h3>
+      <button id="btn-close-modal" class="ghost small" type="button">关闭</button>
+    </div>
+    <p class="hint">
+      这些值都存在项目根目录的 <code>config.json</code> 里，也可以直接改那个文件。
+    </p>
+    <div class="form-grid">
+      <label>ComfyUI 地址<input id="cfg-url" type="text"></label>
+      <label>扩散模型<input id="cfg-unet" type="text"></label>
+      <label>文本编码器<input id="cfg-clip" type="text"></label>
+      <label>VAE<input id="cfg-vae" type="text"></label>
+      <label>采样步数<input id="cfg-steps" type="number"></label>
+      <label>CFG<input id="cfg-cfg" type="number" step="0.1"></label>
+      <label>每帧毫秒<input id="cfg-frame-ms" type="number"></label>
+      <label>表情尺寸<input id="cfg-size" type="number"></label>
+    </div>
+    <div class="modal-foot">
+      <button id="btn-check-models" class="ghost" type="button">读一下 ComfyUI 里实际有哪些模型</button>
+      <button id="btn-save-cfg" class="primary" type="button">保存</button>
+    </div>
+    <div id="model-list" class="model-list"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

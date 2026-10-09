@@ -1,0 +1,33 @@
+{
+  "comfy_url": "http://127.0.0.1:8188",
+  "models": {
+    "unet": "qwen_image_2.1_int8_convrot.safetensors",
+    "clip": "qwen3vl_8b_int8_convrot.safetensors",
+    "vae": "qwen_image_2.1_vae_bf16.safetensors"
+  },
+  "generate": {
+    "steps": 25,
+    "cfg": 1,
+    "sampler": "euler",
+    "scheduler": "simple",
+    "width": 1024,
+    "height": 1024,
+    "resolution": 1024,
+    "base_seed": 20261009
+  },
+  "sticker": {
+    "size": 240,
+    "frame_ms": 400,
+    "edge_trim": 0.055,
+    "edge_trim_bottom": 0.0,
+    "alpha_cut": 128,
+    "text_band": 0.26
+  },
+  "assets": {
+    "banner_width": 750,
+    "banner_height": 400,
+    "banner_feather": 90,
+    "banner_trim_y": 0.06
+  },
+  "workdir": "我的表情包"
+}
