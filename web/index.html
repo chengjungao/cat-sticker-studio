@@ -12,8 +12,9 @@
   <div class="brand">
     <span class="logo" aria-hidden="true">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 9.5 5.2 5.4a1 1 0 0 1 1.7-.4L9 7.2M20 9.5 18.8 5.4a1 1 0 0 0-1.7-.4L15 7.2"/>
-        <path d="M12 7.6c3.6 0 6.5 2.4 6.5 5.6 0 2.8-2.6 4.8-6.5 4.8S5.5 16 5.5 13.2c0-3.2 2.9-5.6 6.5-5.6Z"/>
+        <rect x="3" y="3" width="18" height="18" rx="5.5"/>
+        <path d="M8.6 9.4h.01M15.4 9.4h.01"/>
+        <path d="M8.2 13.7c1 1.3 2.3 2 3.8 2s2.8-.7 3.8-2"/>
       </svg>
     </span>
     <b>表情包工坊</b>
@@ -34,7 +35,7 @@
     <section class="col-left">
 
       <div class="card">
-        <h2><span class="step">1</span>传一张你家猫的照片</h2>
+        <h2><span class="step">1</span><span>传一张照片</span></h2>
         <div id="drop" class="drop">
           <input type="file" id="file" accept="image/*" hidden>
           <div id="drop-empty" class="drop-empty">
@@ -52,15 +53,30 @@
             </div>
           </div>
         </div>
+
+        <div class="subject">
+          <div class="subject-line">
+            <label for="subject">照片里的主角</label>
+            <input type="text" id="subject" maxlength="16" placeholder="猫、狗、我女儿、毛绒玩偶…">
+          </div>
+          <div id="subj-chips" class="chips"></div>
+          <p class="hint">不填就按猫来做。填得越具体，出图越像它。</p>
+        </div>
+
+        <p class="legal">
+          <b>这只照片得是你有权用的。</b>
+          自己拍的，或者已经拿到照片主人的同意。别人的照片、名人的照片，
+          以及别人画的卡通角色，都不要拿来做表情再发出去。
+          照片只在这台电脑上处理，不会上传到任何地方。
+        </p>
       </div>
 
       <div class="card">
-        <h2><span class="step">2</span>说说它长什么样</h2>
-        <textarea id="desc" rows="3"
-          placeholder="例：橘白相间，额头有白色竖纹，胸口一大片白，尾巴橘色带条纹，眼睛是琥珀色"></textarea>
+        <h2><span class="step">2</span><span>说说<span id="desc-who">它</span>长什么样</span></h2>
+        <textarea id="desc" rows="3"></textarea>
         <p class="hint">
           照片负责长相，这句话负责把特征说清楚。两个一起给最稳。
-          不填也能跑，但填了更容易「还是我家那只」。
+          不填也能跑，但填了更容易「还是我家那个」。
         </p>
       </div>
 
@@ -78,7 +94,7 @@
         <div class="opts">
           <label class="opt">
             <input type="checkbox" id="from-photo" checked>
-            <span>用照片当参考（关掉＝只按上面的文字凭空画一只）</span>
+            <span>用照片当参考（关掉＝只按上面的文字凭空画一个）</span>
           </label>
           <label class="opt">
             <input type="checkbox" id="pause-hero">

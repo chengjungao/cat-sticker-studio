@@ -1,7 +1,7 @@
 """表情包工坊 —— 启动入口。
 
     python app.py                启动界面（工程目录默认 ./我的表情包）
-    python app.py --work 我家的猫  指定工程目录
+    python app.py --work 小狗表情包  指定工程目录
     python app.py --port 9000    指定端口
     python app.py --check        不开界面，只做一次环境自检
     python app.py --open         启动后自动打开工程目录
@@ -123,7 +123,7 @@ def cmd_check(cfg):
 
 def main():
     _setup_console()
-    ap = argparse.ArgumentParser(description="表情包工坊：把自家猫的照片做成一套动态表情")
+    ap = argparse.ArgumentParser(description="表情包工坊：把一张照片里的主角做成一套动态表情包")
     ap.add_argument("--work", default="", help="工程目录（默认用 config.json 里的 workdir）")
     ap.add_argument("--port", type=int, default=0, help="服务端口（默认自动挑一个）")
     ap.add_argument("--check", action="store_true", help="只做环境自检")

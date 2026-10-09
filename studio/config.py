@@ -26,7 +26,8 @@ DEFAULTS = {
         "size": 240, "frame_ms": 400, "edge_trim": 0.055,
         "alpha_cut": 128, "text_band": 0.26,
     },
-    "assets": {"banner_width": 750, "banner_height": 400, "banner_feather": 90},
+    "assets": {"banner_width": 750, "banner_height": 400, "banner_feather": 90,
+               "banner_trim_y": 0.06, "icon_head_band": 0.45},
     "workdir": "我的表情包",
 }
 

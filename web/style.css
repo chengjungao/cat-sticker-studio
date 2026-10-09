@@ -1,6 +1,6 @@
 /* 表情包工坊 —— 样式
    视觉语言跟绘本工坊同一套骨架（暖色纸感 + 左侧输入 / 右侧进度 + 全宽结果），
-   主色从木质棕换成橘色，跟「猫」这个主题更贴。 */
+   主色从木质棕换成橘色，跟「表情包」这个主题更贴。 */
 
 :root {
   --bg: #FBF7F2;
@@ -144,6 +144,37 @@ main { max-width: var(--content); margin: 0 auto; padding: 20px var(--pad-x) 60p
   border: 1px solid var(--line); display: block; margin: 0 auto;
 }
 .drop-preview-actions { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
+
+/* 照片里的主角 */
+.subject {
+  margin-top: 13px; padding-top: 13px;
+  border-top: 1px dashed var(--line);
+}
+.subject-line { display: flex; align-items: center; gap: 10px; }
+.subject-line label {
+  flex: 0 0 auto;
+  font-size: 13px; color: var(--ink); font-weight: 600;
+}
+.subject-line input { flex: 1 1 auto; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+button.chip {
+  padding: 3px 11px; font-size: 12.6px; border-radius: 999px;
+  color: var(--muted); background: #fff;
+}
+button.chip.on {
+  color: #fff; background: var(--accent);
+  border-color: var(--accent); font-weight: 600;
+}
+button.chip.on:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
+
+/* 肖像与著作权那条提示。放在上传卡片最下面，出图前一定看得到 */
+.legal {
+  margin: 13px 0 0; padding: 9px 11px;
+  border: 1px solid #E9C6C1; border-left-width: 3px;
+  border-radius: 7px; background: #FDF3F1;
+  color: #7E4B43; font-size: 12.4px; line-height: 1.62;
+}
+.legal b { color: var(--err); }
 
 /* 表情词表 */
 .moods { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }

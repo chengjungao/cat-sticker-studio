@@ -12,15 +12,16 @@
 1. **封面不要另出一张图**，直接拿定妆照那张已经抠净、裁好的 ——
    跟整批表情同一个裁切窗口，比例才一致。
 
-2. **图标不能把整只猫压进 50²**，会糊成一团。取**头部**。
-   ⚠️ 而且取景框不能按「前景宽 × 0.62」估 —— Q 版猫的头本来就将近占满整个宽度，
+2. **图标不能把整个主角压进 50²**，会糊成一团。取**头部**。
+   ⚠️ 而且取景框不能按「前景宽 × 0.62」估 —— Q 版造型的头本来就将近占满整个宽度，
    估出来头顶和耳朵会顶到边。正解是先量**上半段的实际横向跨度**（＝含耳朵的头宽），
    再按它开一个正方形，四周留 11%。
+   换主角类别（人像、玩偶）时取景不理想，调 `config.json` 里的 `icon_head_band`。
 
 3. **横幅有三条硬要求：避免任何文字、避免白底、避免透明底。**
    第一版给米白底就是踩了「避免白底」这条。用明确的彩色底（默认淡蓝）。
    另外横幅不能「等比缩到宽 750 再上下裁成 400」—— 那只留了中间一半，
-   头顶的毛和爪子全被切掉。正解是原图**不裁**、缩成高 400 贴右侧，
+   头顶和手臂全被切掉。正解是原图**不裁**、缩成高 400 贴右侧，
    左边用原图取样的底色铺满，交界处做一段羽化，接缝看不见。
 """
 import io
@@ -35,14 +36,20 @@ HEAD_BAND = 0.45       # 量头宽时只取前景高度的上半段（那一段�
 HEAD_MARGIN = 1.22     # 取景框边长 = 头宽 × 这个系数（四周约留 11%）
 
 
-def head_box(rgba):
-    """按头部真实宽度反推图标取景框。返回 (box, 头宽像素)。"""
+def head_box(rgba, band=HEAD_BAND):
+    """按头部真实宽度反推图标取景框。返回 (box, 头宽像素)。
+
+    `band` 是量头宽时取的上半段比例。0.45 是按 Q 版造型实测出来的：
+    头本身就占了近一半身高。换了主角类别（人像的身长比例不一样）如果
+    图标取景不理想，改 `config.json` 里的 `assets.icon_head_band`，
+    不用动代码。
+    """
     bb = alpha_bbox(rgba)
     if not bb:
         w, h = rgba.size
         return (0, 0, min(w, h), min(w, h)), min(w, h)
     a = rgba.split()[-1].point(lambda v: 255 if v > 8 else 0)
-    band = a.crop((bb[0], bb[1], bb[2], bb[1] + int((bb[3] - bb[1]) * HEAD_BAND)))
+    band = a.crop((bb[0], bb[1], bb[2], bb[1] + int((bb[3] - bb[1]) * band)))
     hb = alpha_bbox(band.convert("RGBA")) or bb
     hw = hb[2] - hb[0]
     side = int(hw * HEAD_MARGIN)
@@ -75,9 +82,9 @@ def make_cover(hero_rgba, path, size=240, trim=0.055, trim_bottom=0.0):
     return spec_ok("%dx%d" % (size, size), (size, size), 500, path)
 
 
-def make_icon(hero_rgba, path, size=50):
+def make_icon(hero_rgba, path, size=50, band=HEAD_BAND):
     """图标 = 定妆照的头部。返回 (报告, 头宽, 取景框, 四边留白)。"""
-    box, hw = head_box(hero_rgba)
+    box, hw = head_box(hero_rgba, band=band)
     head = hero_rgba.crop(box).resize((size, size), Image.LANCZOS)
     head.save(path)
     rep = spec_ok("%dx%d" % (size, size), (size, size), 100, path)
@@ -98,7 +105,7 @@ def make_banner(raw, path_png, width=750, height=400, feather=90, trim_y=0.06,
        而参考图（定妆照）是 1024² —— 所以就算把工作流的宽高设成 1344×768，
        出来还是 1344²。这不是 bug，是那条链路的特点。
     2. **不能「缩到宽 750 再上下裁成 400」**：那只留了中间 53%，
-       猫头顶那撮毛和爪子都被切掉了。
+       头顶那撮毛和手都被切掉了。
 
     做法：原图上下各裁一点点（默认 6%，纯留白），等比缩成高 400 贴**正中间**，
     左右两侧用原图取样的底色铺满，交界处做一段羽化，接缝看不见。

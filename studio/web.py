@@ -195,6 +195,10 @@ class App(object):
         return {
             "ok": True, "workdir": self.dir,
             "config": self.cfg,
+            "subject": prompts.clean_subject(rec.get("subject")),
+            "subject_chips": list(prompts.SUBJECT_CHIPS),
+            "kind": prompts.kind_of(rec.get("subject")),
+            "desc_hint": prompts.desc_hint(rec.get("subject")),
             "desc": rec.get("desc", ""),
             "from_photo": rec.get("from_photo", True),
             "seed": rec.get("seed", self.cfg["generate"]["base_seed"]),
@@ -225,7 +229,7 @@ def _find_free_port(preferred=8770):
 
 class Handler(BaseHTTPRequestHandler):
     app = None
-    server_version = "CatStickerStudio"
+    server_version = "StickerStudio"
 
     def log_message(self, fmt, *args):        # 静音访问日志，控制台只留我们的输出
         pass
@@ -345,6 +349,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/photo/import": self._import_hero,
                 "/api/config": self._config,
                 "/api/moods": self._moods,
+                "/api/subject": self._subject,
                 "/api/run": self._run,
                 "/api/hero": self._hero,
                 "/api/frames": self._frames,
@@ -385,7 +390,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _photo(self, body):
         content = self._decode_image(body.get("data"))
-        name = os.path.basename(body.get("name") or "cat.png")
+        name = os.path.basename(body.get("name") or "ref.png")
         if not name.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".bmp")):
             name += ".png"
         # 只留一张：换照片就是重开一局，别让旧照片在后面被误用
@@ -440,11 +445,27 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(200, {"ok": True, "msg": "表情词表已保存",
                                 "moods": [m["text"] for m in moods]})
 
+    def _subject(self, body):
+        """存下「照片里的主角是什么」，并把第 2 步那句举例一起回去。
+
+        读者每改一次都存一次，所以刷新页面、重启服务都不丢，
+        也保证「主角」在第 2 步的提示语和真正出图时用的是同一个值。
+        """
+        maker = self.app._ensure()
+        subject = prompts.clean_subject(body.get("subject"))
+        rec = maker.record()
+        rec["subject"] = subject
+        maker.save_record(rec)
+        return self._send(200, {"ok": True, "subject": subject,
+                                "kind": prompts.kind_of(subject),
+                                "desc_hint": prompts.desc_hint(subject)})
+
     def _run(self, body):
         maker = self.app._ensure()
         rec = maker.record()
         kwargs = dict(
             desc=body.get("desc", rec.get("desc", "")),
+            subject=body.get("subject") or rec.get("subject"),
             from_photo=bool(body.get("from_photo", rec.get("from_photo", True))),
             seed=body.get("seed") or rec.get("seed"),
             pause_after_hero=bool(body.get("pause_after_hero", False)),
@@ -460,6 +481,7 @@ class Handler(BaseHTTPRequestHandler):
         maker = self.app._ensure()
         rec = maker.record()
         kwargs = dict(desc=body.get("desc", rec.get("desc", "")),
+                      subject=body.get("subject") or rec.get("subject"),
                       from_photo=bool(body.get("from_photo", rec.get("from_photo", True))),
                       seed=body.get("seed") or rec.get("seed"))
         ok, msg = self.app.start_job(lambda m: m.make_hero(**kwargs), "只出定妆照")
@@ -469,6 +491,7 @@ class Handler(BaseHTTPRequestHandler):
         maker = self.app._ensure()
         rec = maker.record()
         kwargs = dict(desc=body.get("desc", rec.get("desc", "")),
+                      subject=body.get("subject") or rec.get("subject"),
                       from_photo=bool(body.get("from_photo", rec.get("from_photo", True))),
                       seed=body.get("seed") or rec.get("seed"))
         ok, msg = self.app.start_job(lambda m: m.make_frames(**kwargs), "批量出帧")

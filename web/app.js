@@ -56,12 +56,64 @@ function setBadge(text, kind) {
   b.className = "badge " + (kind || "badge-idle");
 }
 
+/* ───────────────── 主角 ───────────────── */
+
+/* 「照片里的主角是什么」。它决定两件事：
+   一、提示词按哪一类写（动物 / 人物 / 物件，判断在后端 prompts.kind_of）；
+   二、第 2 步那句举例、以及人称用「它」还是「他」。
+   每改一次都存一次，所以刷新页面不丢，也不会出现「提示语按狗、出图按猫」。 */
+
+let SUBJ_TIMER = null;
+
+function paintSubject(kind, hint, active) {
+  $("desc-who").textContent = kind === "人物" ? "他" : "它";
+  $("desc").placeholder = hint || "";
+  [...$("subj-chips").querySelectorAll("button")].forEach((b) =>
+    b.classList.toggle("on", b.dataset.subject === active));
+}
+
+function renderChips(list) {
+  const box = $("subj-chips");
+  box.innerHTML = "";
+  list.forEach((s) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip";
+    b.dataset.subject = s;
+    b.textContent = s;
+    b.addEventListener("click", () => saveSubject(s, true));
+    box.appendChild(b);
+  });
+}
+
+async function saveSubject(subject, setInput) {
+  const r = await api("/api/subject", { subject });
+  if (!r || r.ok === false) return;
+  if (setInput) $("subject").value = r.subject;
+  paintSubject(r.kind, r.desc_hint, r.subject);
+}
+
+/* 点「开始」之前先把输入框里那半句落库，避免防抖还没触发就开跑 */
+async function flushSubject() {
+  clearTimeout(SUBJ_TIMER);
+  return saveSubject($("subject").value, false);
+}
+
+$("subject").addEventListener("input", () => {
+  clearTimeout(SUBJ_TIMER);
+  SUBJ_TIMER = setTimeout(() => saveSubject($("subject").value, false), 400);
+});
+$("subject").addEventListener("blur", () => flushSubject());
+
 /* ───────────────── 初始化 ───────────────── */
 
 async function boot() {
   STATE = await api("/api/state");
   if (!STATE || !STATE.ok) return toast("读工程状态失败", "err");
 
+  $("subject").value = STATE.subject || "";
+  renderChips(STATE.subject_chips || []);
+  paintSubject(STATE.kind, STATE.desc_hint, STATE.subject);
   $("desc").value = STATE.desc || "";
   $("from-photo").checked = STATE.from_photo !== false;
   $("seed").value = STATE.seed;
@@ -152,6 +204,7 @@ async function uploadPhoto(dataUrl, name) {
 
 $("btn-run").addEventListener("click", () => run({
   desc: $("desc").value,
+  subject: $("subject").value,
   from_photo: $("from-photo").checked,
   seed: Number($("seed").value) || undefined,
   pause_after_hero: $("pause-hero").checked,
@@ -162,6 +215,7 @@ $("btn-continue").addEventListener("click", async () => {
   await api("/api/moods", { texts: moodTexts() });
   await run({
     desc: $("desc").value,
+    subject: $("subject").value,
     from_photo: $("from-photo").checked,
     seed: Number($("seed").value) || undefined,
     skip_hero: true,
@@ -170,8 +224,9 @@ $("btn-continue").addEventListener("click", async () => {
 
 async function run(payload) {
   if ($("from-photo").checked && !(STATE.photos || []).length) {
-    return toast("先传一张猫的照片，或者关掉「用照片当参考」", "err");
+    return toast("先传一张照片，或者关掉「用照片当参考」", "err");
   }
+  await flushSubject();
   await api("/api/moods", { texts: payload.texts || moodTexts() });
   const r = await api("/api/run", payload);
   if (r.ok) {
@@ -191,26 +246,32 @@ $("btn-cancel").addEventListener("click", async () => {
 });
 
 $("btn-hero").addEventListener("click", async () => {
+  await flushSubject();
   await api("/api/moods", { texts: moodTexts() });
   const r = await api("/api/hero", {
-    desc: $("desc").value, from_photo: $("from-photo").checked,
+    desc: $("desc").value, subject: $("subject").value,
+    from_photo: $("from-photo").checked,
     seed: Number($("seed").value) || undefined,
   });
   if (r.ok) { RUNNING = true; $("btn-cancel").classList.remove("hidden"); }
 });
 $("btn-frames").addEventListener("click", async () => {
+  await flushSubject();
   await api("/api/moods", { texts: moodTexts() });
   const r = await api("/api/frames", {
-    desc: $("desc").value, from_photo: $("from-photo").checked,
+    desc: $("desc").value, subject: $("subject").value,
+    from_photo: $("from-photo").checked,
     seed: Number($("seed").value) || undefined,
   });
   if (r.ok) { RUNNING = true; $("btn-cancel").classList.remove("hidden"); }
 });
 $("btn-post").addEventListener("click", async () => {
+  await flushSubject();
   const r = await api("/api/post", {});
   if (r.ok) { RUNNING = true; $("btn-cancel").classList.remove("hidden"); }
 });
 $("btn-repack").addEventListener("click", async () => {
+  await flushSubject();
   const r = await api("/api/pack", {});
   if (r.ok) toast("已重新打包", "ok");
 });

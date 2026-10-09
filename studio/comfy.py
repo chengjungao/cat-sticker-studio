@@ -86,7 +86,7 @@ class Comfy(object):
 
     def post_multipart(self, path, fields, files, timeout=None):
         """files: {字段名: (文件名, 字节)}"""
-        boundary = "----CatSticker" + uuid.uuid4().hex
+        boundary = "----StickerStudio" + uuid.uuid4().hex
         buf = []
         for k, v in fields.items():
             buf.append(("--%s\r\n" % boundary).encode("utf-8"))
@@ -203,7 +203,7 @@ class Comfy(object):
         return (sub + "/" + nm) if sub else nm
 
     def submit(self, api_workflow):
-        res = self.post_json("/prompt", {"prompt": api_workflow, "client_id": "catsticker"})
+        res = self.post_json("/prompt", {"prompt": api_workflow, "client_id": "stickerstudio"})
         errs = res.get("node_errors") or {}
         if errs:
             raise ComfyError("工作流校验没过：%s"

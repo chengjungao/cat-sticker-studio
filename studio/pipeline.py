@@ -2,7 +2,7 @@
 
 流程四步，顺序不能换：
 
-    1. 定妆照   —— 拿读者的猫照片当参考图，出一张 Q 版卡通定妆照
+    1. 定妆照   —— 拿读者上传的照片当参考图，出一张 Q 版卡通定妆照
     2. N×2 帧   —— 以定妆照为**唯一**参考图，逐张出每一帧
     3. 后处理   —— 抠图 → 统一窗口裁 240 → 合成 GIF → 封面/图标/横幅
     4. 打包     —— 提交清单 + zip
@@ -10,6 +10,11 @@
 第 1 步是整套的唯一一致性来源。它错了，后面 16 张全跟着错。
 所以留了一个 `pause_after_hero` 开关：花 20 秒看一眼定妆照，
 比后面重出 16 张便宜得多。
+
+`subject` 是读者填的「照片里的主角是什么」，默认猫。它只影响提示词按哪一类
+（动物 / 人物 / 物件）来写，流程图本身与主角是谁无关。
+下面每个方法都收 `subject=None`，意思是「用工程记录里存着的那个」——
+只跑后处理、重打包这类半路操作不会把主角改掉。
 
 批量出帧用的是「**一次把全部任务压进队列，再统一轮询**」——
 让显卡一直有活干，中间不用管。
@@ -36,6 +41,18 @@ DIR_BANNER = "04_详情页横幅"
 DIR_BOARD = "05_对照图"
 
 RECORD = "生成记录.json"
+
+
+def default_title(subject):
+    """打包用的名字。
+
+    动物写成「我家的猫」，这是养宠物的人本来的说法；
+    人像和玩偶就直接用主角自己，写成「我家的我女儿」不通。
+    """
+    s = prompts.clean_subject(subject)
+    if prompts.kind_of(s) == prompts.KIND_ANIMAL:
+        return "我家的%s" % s
+    return s
 
 
 class Canceled(Exception):
@@ -111,7 +128,7 @@ class StickerMaker(object):
         with io.open(os.path.join(self.dir, RECORD), "w", encoding="utf-8") as f:
             f.write(json.dumps(rec, ensure_ascii=False, indent=2))
 
-    def save_photo(self, content, filename="cat_1.png"):
+    def save_photo(self, content, filename="ref_1.png"):
         """把界面上传的照片落到工程目录。"""
         dst = self.sub(DIR_PHOTO, filename)
         with open(dst, "wb") as f:
@@ -126,14 +143,20 @@ class StickerMaker(object):
     def has_hero(self):
         return os.path.exists(self.hero_path())
 
-    def make_hero(self, desc="", from_photo=True, seed=None):
+    def subject(self):
+        """这次工程的主角。没记过就按默认的猫。"""
+        return prompts.clean_subject(self.record().get("subject"))
+
+    def make_hero(self, desc="", from_photo=True, seed=None,
+                  subject=None):
         rec = self.record()
         seed = int(seed if seed is not None else rec.get("seed")
                    or self.cfg["generate"]["base_seed"])
         gen = dict(self.cfg["generate"])
         gen["width"] = gen["height"] = self.cfg["sticker"].get("gen_size", 1024)
 
-        prompt = prompts.hero_prompt(desc, from_photo=from_photo)
+        subject = prompts.clean_subject(subject or rec.get("subject"))
+        prompt = prompts.hero_prompt(desc, from_photo=from_photo, subject=subject)
         self._emit({"type": "stage", "stage": "hero",
                     "msg": "正在出定妆照（整套一致性的来源）…"})
         self._emit({"type": "prompt", "id": "hero", "prompt": prompt})
@@ -141,14 +164,14 @@ class StickerMaker(object):
         if from_photo:
             ph = self.photos()
             if not ph:
-                raise ComfyError("还没有照片。请先上传一张猫的照片，"
+                raise ComfyError("还没有照片。请先上传一张照片，"
                                  "或者关掉「用照片」改用文字描述。")
-            ref = self.comfy.upload_image(ph[0], "cat_ref.png")
+            ref = self.comfy.upload_image(ph[0], "ref_1.png")
             wf = build_i2i(self.cfg["models"], gen, prompt, seed, "cs_hero",
-                           ref, negative=prompts.NEGATIVE)
+                           ref, negative=prompts.negative_for(subject))
         else:
             wf = build_t2i(self.cfg["models"], gen, prompt, seed, "cs_hero",
-                           negative=prompts.NEGATIVE)
+                           negative=prompts.negative_for(subject))
 
         dst = self.sub(DIR_RAW, "hero.png")
         self._run_one(wf, dst, "hero", "定妆照")
@@ -167,7 +190,8 @@ class StickerMaker(object):
     def frame_name(self, i, text, tag):
         return "%02d_%s_%s" % (i, _safe(text), tag)
 
-    def make_frames(self, desc="", from_photo=True, moods=None, seed=None, only=None):
+    def make_frames(self, desc="", from_photo=True, moods=None, seed=None, only=None,
+                    subject=None):
         """出所有帧。`only` 传索引列表时只出那几张。"""
         rec = self.record()
         seed = int(seed if seed is not None else rec.get("seed")
@@ -175,6 +199,7 @@ class StickerMaker(object):
         desc = desc or rec.get("desc", "")
         from_photo = rec.get("from_photo", from_photo) if "from_photo" in rec else from_photo
         moods = moods or rec.get("moods") or prompts.DEFAULT_MOODS
+        subject = prompts.clean_subject(subject or rec.get("subject"))
 
         if not self.has_hero():
             raise ComfyError("还没有定妆照，没法出表情。")
@@ -200,12 +225,13 @@ class StickerMaker(object):
                 if os.path.exists(dst) and not (only and i in only):
                     idx_done += 1
                     continue
-                pr = prompts.frame_prompt(m["text"], state, desc, from_photo=from_photo)
+                pr = prompts.frame_prompt(m["text"], state, desc, from_photo=from_photo,
+                                          subject=subject)
                 # ⭐ 同一张的两帧用**同一个种子**：模型看到的是同一张底片，
                 # 只改「动作与神态」那一处，其余照旧。这是让 GIF 不乱跳的关键。
                 fseed = seed + i * 10
                 wf = build_i2i(self.cfg["models"], gen, pr, fseed, "cs_" + name,
-                               ref, negative=prompts.NEGATIVE)
+                               ref, negative=prompts.negative_for(subject))
                 self._emit({"type": "prompt", "id": name, "prompt": pr})
                 pid = self.comfy.submit(wf)
                 jobs.append({"id": name, "pid": pid, "dst": dst, "index": i,
@@ -233,9 +259,10 @@ class StickerMaker(object):
 
     # ---------- 第 3 步：后处理 ----------
 
-    def postprocess(self, moods=None, desc=""):
+    def postprocess(self, moods=None, desc="", subject=None):
         rec = self.record()
         moods = moods or rec.get("moods") or prompts.DEFAULT_MOODS
+        subject = prompts.clean_subject(subject or rec.get("subject"))
         st = self.cfg["sticker"]
         size, frame_ms = int(st["size"]), int(st["frame_ms"])
         trim, cut = float(st["edge_trim"]), int(st["alpha_cut"])
@@ -273,8 +300,8 @@ class StickerMaker(object):
                                     frame_ms=frame_ms, alpha_cut=cut)
             m_metric.update(info)
             m_metric.update({"text": text, "gif_name": gif_name,
-                             "frame1": m["frames"][0][:28],
-                             "frame2": m["frames"][1][:28]})
+                             "frame1": prompts.state_for(m["frames"][0], subject)[:28],
+                             "frame2": prompts.state_for(m["frames"][1], subject)[:28]})
             items.append(m_metric)
             tiles.append(frames[0])
             labels.append(text)
@@ -301,8 +328,9 @@ class StickerMaker(object):
         self._emit({"type": "stage", "stage": "assets", "msg": "正在做封面与图标…"})
         cover_rep = assets.make_cover(hero_rgba, self.sub(DIR_COVER, "封面_240.png"),
                                       size=size, trim=trim, trim_bottom=trim_b)
-        icon_rep, hw, box, pads = assets.make_icon(hero_rgba,
-                                                  self.sub(DIR_ICON, "图标_50.png"), size=50)
+        icon_rep, hw, box, pads = assets.make_icon(
+            hero_rgba, self.sub(DIR_ICON, "图标_50.png"), size=50,
+            band=float(self.cfg["assets"].get("icon_head_band", 0.45)))
         assets.preview_board(self.sub(DIR_COVER, "封面_240.png"),
                              self.sub(DIR_ICON, "图标_50.png"),
                              self.sub(DIR_BOARD, "_提交件对照.jpg"))
@@ -310,7 +338,7 @@ class StickerMaker(object):
         # ---- 横幅（要另出一张横版） ----
         banner_rep = None
         try:
-            banner_rep = self.make_banner(desc)
+            banner_rep = self.make_banner(desc, subject=subject)
         except (ComfyError, Canceled) as e:
             self._emit({"type": "log", "msg": "横幅没做出来：%s（其余素材不受影响）" % e})
 
@@ -318,11 +346,12 @@ class StickerMaker(object):
                 "hero_bg_ratio": round(hero_bg, 3), "head_width_px": hw,
                 "icon_pads_px": pads, "banner": banner_rep}
 
-    def make_banner(self, desc="", seed=None):
+    def make_banner(self, desc="", seed=None, subject=None):
         """详情页横幅。横版另出一张图，再合成到 750×400。"""
         a = self.cfg["assets"]
         W, H = int(a["banner_width"]), int(a["banner_height"])
         rec = self.record()
+        subject = prompts.clean_subject(subject or rec.get("subject"))
         seed = int(seed if seed is not None else (rec.get("seed") or 0)
                    + 1000 or self.cfg["generate"]["base_seed"] + 1000)
         raw = os.path.join(self.dir, DIR_RAW, "banner_raw.png")
@@ -332,8 +361,9 @@ class StickerMaker(object):
             self._emit({"type": "stage", "stage": "banner",
                         "msg": "正在出详情页横幅（横版）…"})
             ref = self.comfy.upload_image(self.hero_path(), "cs_hero_banner.png")
-            wf = build_i2i(self.cfg["models"], gen, prompts.banner_prompt(desc), seed,
-                           "cs_banner", ref, negative=prompts.BANNER_NEGATIVE)
+            wf = build_i2i(self.cfg["models"], gen,
+                           prompts.banner_prompt(desc, subject=subject), seed,
+                           "cs_banner", ref, negative=prompts.banner_negative(subject))
             self._run_one(wf, raw, "banner", "横幅")
         rep = assets.make_banner(raw, self.sub(DIR_BANNER, "横幅_%dx%d.png" % (W, H)),
                                  width=W, height=H, feather=int(a["banner_feather"]),
@@ -346,9 +376,11 @@ class StickerMaker(object):
 
     # ---------- 第 4 步：清单与打包 ----------
 
-    def finish(self, result, desc="", title="我家的猫"):
+    def finish(self, result, desc="", title=None, subject=None):
         rec = self.record()
         cfg = self.cfg
+        subject = prompts.clean_subject(subject or rec.get("subject"))
+        title = title or default_title(subject)
         items = result["items"]
         ious = [m["iou"] for m in items] or [0]
         gif_kb = "、".join("%.1fK" % (m["gif_bytes"] / 1024.0) for m in items)
@@ -374,9 +406,10 @@ class StickerMaker(object):
             "sampler": cfg["generate"]["sampler"], "scheduler": cfg["generate"]["scheduler"],
             "resolution": cfg["generate"]["resolution"],
             "base_seed": rec.get("seed", cfg["generate"]["base_seed"]),
-            "photo_note": ("用读者上传的照片（%d 张）"
-                           % len(self.photos())) if self.photos() else "未用照片，纯文字描述",
+            "photo_note": ("读者上传的照片（%d 张）"
+                           % len(self.photos())) if self.photos() else "纯文字描述（没有用照片）",
             "desc": desc or rec.get("desc") or "（未填）",
+            "subject": subject,
             "when": time.strftime("%Y-%m-%d %H:%M"),
             "moods": [{"text": m["text"], "gif_name": m["gif_name"],
                        "frame1": m["frame1"], "frame2": m["frame2"],
@@ -390,10 +423,13 @@ class StickerMaker(object):
     # ---------- 一键到底 ----------
 
     def generate(self, desc="", from_photo=True, moods=None, seed=None,
-                 pause_after_hero=False, skip_hero=False):
+                 pause_after_hero=False, skip_hero=False,
+                 subject=None):
         """完整流程。`pause_after_hero` 时出完定妆照就停下等确认。"""
         rec = self.record()
+        subject = prompts.clean_subject(subject or rec.get("subject"))
         rec.update({"desc": desc, "from_photo": bool(from_photo),
+                    "subject": subject,
                     "moods": moods or rec.get("moods") or prompts.DEFAULT_MOODS,
                     "seed": int(seed if seed is not None else
                                 rec.get("seed") or self.cfg["generate"]["base_seed"])})
@@ -401,16 +437,18 @@ class StickerMaker(object):
         t_all = time.time()
 
         if not skip_hero or not self.has_hero():
-            self.make_hero(desc, from_photo=from_photo, seed=rec["seed"])
+            self.make_hero(desc, from_photo=from_photo, seed=rec["seed"],
+                           subject=subject)
             if pause_after_hero:
                 self._emit({"type": "stage_done", "stage": "hero",
                             "elapsed": round(time.time() - t_all, 1), "results": [],
                             "msg": "定妆照好了，看一眼再决定要不要继续"})
                 return {"paused": True, "hero": self.hero_path()}
 
-        self.make_frames(desc, from_photo=from_photo, moods=rec["moods"], seed=rec["seed"])
-        result = self.postprocess(moods=rec["moods"], desc=desc)
-        z = self.finish(result, desc=desc)
+        self.make_frames(desc, from_photo=from_photo, moods=rec["moods"],
+                         seed=rec["seed"], subject=subject)
+        result = self.postprocess(moods=rec["moods"], desc=desc, subject=subject)
+        z = self.finish(result, desc=desc, subject=subject)
         result["zip"] = z
         result["elapsed"] = round(time.time() - t_all, 1)
         self._emit({"type": "stage_done", "stage": "all",
